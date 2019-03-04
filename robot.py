@@ -1,6 +1,7 @@
 
 from inputs import get_gamepad
 import RPi.GPIO as GPIO
+import pigpio
 import Slush
 import math
 import time
@@ -19,7 +20,7 @@ for joint in joints:
 joints[0].setMaxSpeed(150)
 joints[1].setMaxSpeed(150)
 joints[2].setMaxSpeed(250)
-joints[3].setMaxSpeed(150)
+joints[3].setMaxSpeed(250)
 joints[4].setMaxSpeed(150)
 joints[5].setMaxSpeed(150)
 
@@ -27,14 +28,15 @@ joints[5].setMaxSpeed(150)
 joints[0].setCurrent(65, 85, 75, 70)
 joints[1].setCurrent(65, 85, 85, 65)
 joints[2].setCurrent(50, 50, 50, 50)
-joints[3].setCurrent(75, 75, 75, 75)
+joints[3].setCurrent(50, 50, 50, 50)
 joints[4].setCurrent(85, 85, 85, 85)
-joints[5].setCurrent(65,65, 65, 65)
+joints[5].setCurrent(65, 65, 65, 65)
 
 #setup the gripper
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(18, GPIO.OUT)
-pwm = GPIO.PWM(18, 100)
+#GPIO.setmode(GPIO.BCM)
+#GPIO.setup(18, GPIO.OUT)
+#pwm = GPIO.PWM(18, 100)
+pi = pigpio.pi()
 
 
 def waitForRobot():
@@ -101,105 +103,133 @@ def runProgram():
             if lineinfo[0] == "GRIPPER":
                 waitForRobot()
                 if lineinfo[1] == "OPEN":
-                    pwm.start(7)
+                    #pwm.start(7)
+                    pi.set_servo_pulsewidth(18, 1000)
                 if lineinfo[1] == "CLOSE":
-                    pwm.start(17)
+                    #pwm.start(17)
+                    pi.set_servo_pulsewidth(18, 1700)
             if lineinfo[0] == "EXIT":
                 break
+        print("Task completed\n")
 
 #start reading the inputs from the gamepad and putting them out the joints
-gripper = 7
-while 1:
-    events = get_gamepad()
-    for event in events:
-        if event.code == 'BTN_MODE':
-            value = event.state
-            if value == 1:
-                for joint in joints:
-                    joint.free()
-        
-        if event.code == 'ABS_X':
-            value = event.state
-            if value < -1500:
-                if not joints[0].isBusy(): joints[0].run(1, 35)
-            elif value > 5000:
-                if not joints[0].isBusy(): joints[0].run(0, 35)
-            else:
-                if not joints[0].isBusy(): joints[0].softStop()
-        if event.code == 'ABS_Y':
-            value = event.state
-            if value < -1500:
-                if not joints[1].isBusy(): joints[1].run(1, 20)
-            elif value > 5000:
-                if not joints[1].isBusy(): joints[1].run(0, 20)
-            else:
-                if not joints[1].isBusy(): joints[1].softStop()
-        if event.code == 'ABS_RX':
-            value = event.state
-            if value < -3500:
-                if not joints[2].isBusy(): joints[2].run(1, 100)
-            elif value > 3500:
-                if not joints[2].isBusy(): joints[2].run(0, 100)
-            else:
-                if not joints[2].isBusy(): joints[2].softStop()
-        if event.code == 'ABS_RY':
-            value = event.state
-            if value < -3500:
-                if not joints[3].isBusy(): joints[3].run(1, 10)
-            elif value > 3500:
-                if not joints[3].isBusy(): joints[3].run(0, 10)
-            else:
-                if not joints[3].isBusy(): joints[3].softStop()
-        if event.code == 'ABS_HAT0Y':
-            value = event.state
-            if value == 1:
-                if not joints[4].isBusy(): joints[4].run(1, 20)
-            elif value == -1:
-                if not joints[4].isBusy(): joints[4].run(0, 20)
-            else:
-                if not joints[4].isBusy(): joints[4].softStop()
-        if event.code == 'ABS_HAT0X':
-            value = event.state
-            if value == 1:
-                if not joints[5].isBusy(): joints[5].run(1, 20)
-            elif value == -1:
-                if not joints[5].isBusy(): joints[5].run(0, 20)
-            else:
-                if not joints[5].isBusy(): joints[5].softStop()
-        if event.code == 'BTN_TL':
-            if event.state == 1:
-                gripper = gripper - 1
-                if gripper < 7:
-                    gripper = 7
-                pwm.start(gripper)
-        if event.code == 'BTN_TR':
-            if event.state == 1:
-                gripper = gripper + 1
-                if gripper > 17:
-                    gripper = 17
-                pwm.start(gripper)
-        #calibrate all axis if on point
-        if event.code == 'BTN_START':
-            if event.state == 1:
-                for joint in joints:
-                    joint.setAsHome()
-        if event.code == 'BTN_SOUTH':
-            if event.state == 1:
-                print ("no function")
-        if event.code == 'BTN_NORTH':
-            if event.state == 1:
-                runProgram()
-        if event.code == 'BTN_EAST':
-            if event.state == 1:
-                name = input('Name Point (no spaces): ')
-                if name == 'EXIT': break
-                with open("example/points.ini", "a") as pointfile:
+try:
+    gripper = 750
+    while 1:
+        events = get_gamepad()
+        for event in events:
+            if event.code == 'BTN_MODE':
+                value = event.state
+                if value == 1:
                     for joint in joints:
-                        name += (':'+str(joint.getPosition()))
-                    name +=(':' + str(gripper))
-                    name +=('\n')
-                    pointfile.write(name)
-        if event.code == 'BTN_WEST':
-            if event.state == 1:
-                name = input('Go To Point (no spaced): ')
-                moveFilePoint(name)
+                        joint.free()
+                    pi.set_servo_pulsewidth(18, 0)
+                    print("Safe drop")           
+            if event.code == 'ABS_X':
+                value = event.state
+                if value < -1500:
+                    if not joints[0].isBusy(): joints[0].run(1, 35)
+                elif value > 5000:
+                    if not joints[0].isBusy(): joints[0].run(0, 35)
+                else:
+                    if not joints[0].isBusy(): joints[0].softStop()
+            if event.code == 'ABS_Y':
+                value = event.state
+                if value < -1500:
+                    if not joints[1].isBusy(): joints[1].run(1, 20)
+                elif value > 5000:
+                    if not joints[1].isBusy(): joints[1].run(0, 20)
+                else:
+                    if not joints[1].isBusy(): joints[1].softStop()
+            if event.code == 'ABS_RX':
+                value = event.state
+                if value < -3500:
+                    if not joints[2].isBusy(): joints[2].run(1, 100)
+                elif value > 3500:
+                    if not joints[2].isBusy(): joints[2].run(0, 100)
+                else:
+                    if not joints[2].isBusy(): joints[2].softStop()
+            if event.code == 'ABS_RY':
+                value = event.state
+                if value < -3500:
+                    if not joints[3].isBusy(): joints[3].run(1, 10)
+                elif value > 3500:
+                    if not joints[3].isBusy(): joints[3].run(0, 10)
+                else:
+                    if not joints[3].isBusy(): joints[3].softStop()
+            if event.code == 'ABS_HAT0Y':
+                value = event.state
+                if value == 1:
+                    if not joints[4].isBusy(): joints[4].run(1, 20)
+                elif value == -1:
+                    if not joints[4].isBusy(): joints[4].run(0, 20)
+                else:
+                    if not joints[4].isBusy(): joints[4].softStop()
+            if event.code == 'ABS_HAT0X':
+                value = event.state
+                if value == 1:
+                    if not joints[5].isBusy(): joints[5].run(1, 20)
+                elif value == -1:
+                    if not joints[5].isBusy(): joints[5].run(0, 20)
+                else:
+                    if not joints[5].isBusy(): joints[5].softStop()
+            if event.code == 'BTN_TL':
+                if event.state == 1:
+                    gripper = gripper - 250
+                    if gripper < 900:
+                        gripper = 900
+                    #pwm.start(gripper)
+                    pi.set_servo_pulsewidth(18, gripper)
+            if event.code == 'BTN_TR':
+                if event.state == 1:
+                    gripper = gripper + 250
+                    if gripper > 1900:
+                        gripper = 1900
+                    #pwm.start(gripper)
+                    pi.set_servo_pulsewidth(18, gripper)
+            #calibrate all axis if on point
+            if event.code == 'BTN_START':
+                if event.state == 1:
+                    moveFilePoint("HOME")
+                    print("Going HOME")                    
+            if event.code == 'BTN_SOUTH':
+                if event.state == 1:
+                    print("Button A pressed")
+                    print("Gripper open")
+                    pi.set_servo_pulsewidth(18, 900)
+                    time.sleep(5)
+                    print("Gripper close")
+                    pi.set_servo_pulsewidth(18, 1900)
+                    time.sleep(5)
+                    print("Gripper turnoff\n")
+                    pi.set_servo_pulsewidth(18, 0)
+            if event.code == 'BTN_NORTH':
+                if event.state == 1:
+                    print("Button X pressed\nRunning demo program...")
+                    runProgram()
+            if event.code == 'BTN_EAST':
+                if event.state == 1:
+                    print("Button B pressed")
+                    name = input('Name Point (no spaces): ')
+                    if name == 'EXIT': break
+                    with open("example/points.ini", "a") as pointfile:
+                        for joint in joints:
+                            name += (':'+str(joint.getPosition()))
+                        name +=(':' + str(gripper))
+                        name +=('\n')
+                        pointfile.write(name)
+            if event.code == 'BTN_WEST':
+                if event.state == 1:
+                    print("Button Y pressed")
+                    name = input('Go To Point (no spaced): ')
+                    moveFilePoint(name)
+except KeyboardInterrupt:
+    print("\nKeyboard Interrupt")
+    print("Port cleaning up...\nWaiting for robot...")
+    moveFilePoint("HOME")
+    waitForRobot()
+    GPIO.cleanup()
+    pi.set_servo_pulsewidth(18, 0)
+    print("Successful shutdown")
+   
+                        
